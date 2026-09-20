@@ -2,32 +2,36 @@ from flask import Flask, request, render_template_string
 import pandas as pd
 import numpy as np
 import os
+
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
 
 
-# =========================================================
+# ============================================================
 # FLASK APP
-# =========================================================
+# ============================================================
 
 app = Flask(__name__)
 
 
-# =========================================================
-# 1. LOAD DATASET
-# =========================================================
+# ============================================================
+# LOAD DATASET
+# ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-data = pd.read_csv(os.path.join(BASE_DIR, "house_data.csv"))
 
-print("\n================ HOUSE PRICE DATASET ================\n")
-print(data)
+DATA_PATH = os.path.join(BASE_DIR, "house_data.csv")
+
+data = pd.read_csv(DATA_PATH)
 
 
-# =========================================================
-# 2. SELECT FEATURES AND TARGET
-# =========================================================
+# ============================================================
+# SELECT FEATURES AND TARGET
+# ============================================================
 
 X = data[
     [
@@ -41,29 +45,9 @@ X = data[
 y = data["Price"]
 
 
-# =========================================================
-# 3. CONVERT LOCATION INTO NUMERIC CODE
-# =========================================================
-
-location_codes = {
-    "Jaipur": 1,
-    "Delhi": 2,
-    "Mumbai": 3,
-    "Bangalore": 4,
-    "Pune": 5
-}
-
-X = X.copy()
-
-X["Location"] = X["Location"].map(location_codes)
-
-# Missing location ko 0 kar do
-X["Location"] = X["Location"].fillna(0)
-
-
-# =========================================================
-# 4. TRAIN TEST SPLIT
-# =========================================================
+# ============================================================
+# TRAIN TEST SPLIT
+# ============================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -73,119 +57,201 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 
-# =========================================================
-# 5. TRAIN LINEAR REGRESSION MODEL
-# =========================================================
+# ============================================================
+# PREPROCESSING
+# ============================================================
 
-model = LinearRegression()
+preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "location",
+            OneHotEncoder(handle_unknown="ignore"),
+            ["Location"]
+        )
+    ],
+    remainder="passthrough"
+)
+
+
+# ============================================================
+# MODEL
+# ============================================================
+
+model = Pipeline(
+    steps=[
+        ("preprocessor", preprocessor),
+        ("regressor", LinearRegression())
+    ]
+)
+
+
+# ============================================================
+# TRAIN MODEL
+# ============================================================
 
 model.fit(X_train, y_train)
 
 
-# =========================================================
-# 6. MODEL PREDICTION
-# =========================================================
+# ============================================================
+# MODEL EVALUATION
+# ============================================================
 
 y_pred = model.predict(X_test)
 
-
-# =========================================================
-# 7. MODEL EVALUATION
-# =========================================================
-
 mae = mean_absolute_error(y_test, y_pred)
-
 r2 = r2_score(y_test, y_pred)
 
-print("\n================ MODEL RESULT ================\n")
 
-print(f"Mean Absolute Error: {mae:.2f}")
+# ============================================================
+# HTML PAGE
+# ============================================================
 
-print(f"R2 Score: {r2:.4f}")
-
-
-# =========================================================
-# 8. HOME PAGE
-# =========================================================
-
-HTML_PAGE = """
+HTML = """
 <!DOCTYPE html>
-
-<html>
+<html lang="en">
 
 <head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
     <title>House Price Prediction</title>
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background: #f2f2f2;
             margin: 0;
             padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(
+                135deg,
+                #667eea,
+                #764ba2
+            );
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .container {
-            width: 500px;
-            margin: 60px auto;
+            width: 95%;
+            max-width: 650px;
             background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0px 0px 15px rgba(0,0,0,0.2);
+            padding: 35px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
         }
 
         h1 {
             text-align: center;
+            margin-bottom: 10px;
             color: #333;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #777;
+            margin-bottom: 30px;
         }
 
         label {
             display: block;
-            margin-top: 15px;
+            margin-top: 18px;
+            margin-bottom: 7px;
             font-weight: bold;
+            color: #333;
         }
 
-        input, select {
+        input,
+        select {
             width: 100%;
-            padding: 12px;
-            margin-top: 5px;
-            box-sizing: border-box;
+            padding: 13px;
             border: 1px solid #ccc;
             border-radius: 8px;
+            font-size: 16px;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
         }
 
         button {
             width: 100%;
-            padding: 13px;
             margin-top: 25px;
-            background: #007bff;
-            color: white;
+            padding: 14px;
             border: none;
             border-radius: 8px;
-            font-size: 16px;
+            background: #667eea;
+            color: white;
+            font-size: 17px;
+            font-weight: bold;
             cursor: pointer;
         }
 
         button:hover {
-            background: #0056b3;
+            background: #5568d9;
         }
 
         .result {
             margin-top: 25px;
-            padding: 15px;
-            background: #e8f5e9;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 12px;
+            background: #f0f7ff;
             text-align: center;
-            font-size: 20px;
-            font-weight: bold;
         }
 
-        .info {
+        .result-title {
+            font-size: 16px;
+            color: #555;
+        }
+
+        .price {
+            font-size: 30px;
+            font-weight: bold;
+            color: #2e7d32;
+            margin-top: 8px;
+        }
+
+        .model-info {
             margin-top: 25px;
+            padding: 18px;
+            background: #f7f7f7;
+            border-radius: 10px;
+        }
+
+        .model-info h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .model-info p {
+            margin: 8px 0;
+            color: #555;
+        }
+
+        .error {
+            margin-top: 20px;
             padding: 15px;
-            background: #f5f5f5;
+            background: #ffecec;
+            color: #c62828;
             border-radius: 8px;
+            text-align: center;
+        }
+
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
         }
 
     </style>
@@ -199,51 +265,83 @@ HTML_PAGE = """
 
     <h1>🏠 House Price Prediction</h1>
 
+    <div class="subtitle">
+        Predict house prices using Machine Learning
+    </div>
+
+
     <form method="POST">
 
-        <label>Area (sqft)</label>
+        <label for="area">
+            Area (sqft)
+        </label>
 
         <input
             type="number"
+            id="area"
             name="area"
-            placeholder="Enter area"
+            placeholder="Example: 2000"
+            min="100"
+            step="1"
             required
+            value="{{ area }}"
         >
 
 
-        <label>Number of Bedrooms</label>
+        <label for="bedrooms">
+            Number of Bedrooms
+        </label>
 
         <input
             type="number"
+            id="bedrooms"
             name="bedrooms"
-            placeholder="Enter bedrooms"
+            placeholder="Example: 4"
+            min="1"
+            step="1"
             required
+            value="{{ bedrooms }}"
         >
 
 
-        <label>Number of Bathrooms</label>
+        <label for="bathrooms">
+            Number of Bathrooms
+        </label>
 
         <input
             type="number"
+            id="bathrooms"
             name="bathrooms"
-            placeholder="Enter bathrooms"
+            placeholder="Example: 3"
+            min="1"
+            step="1"
             required
+            value="{{ bathrooms }}"
         >
 
 
-        <label>Location</label>
+        <label for="location">
+            Location
+        </label>
 
-        <select name="location" required>
+        <select
+            id="location"
+            name="location"
+            required
+        >
 
-            <option value="Jaipur">Jaipur</option>
+            {% for loc in locations %}
 
-            <option value="Delhi">Delhi</option>
+                <option
+                    value="{{ loc }}"
+                    {% if loc == location %}
+                    selected
+                    {% endif %}
+                >
+                    {{ loc }}
+                </option>
 
-            <option value="Mumbai">Mumbai</option>
-
-            <option value="Bangalore">Bangalore</option>
-
-            <option value="Pune">Pune</option>
+            {% endfor %}
 
         </select>
 
@@ -259,33 +357,57 @@ HTML_PAGE = """
 
     <div class="result">
 
-        Predicted House Price:
+        <div class="result-title">
+            Estimated House Price
+        </div>
 
-        <br>
-
-        ₹ {{ prediction }}
+        <div class="price">
+            {{ prediction }}
+        </div>
 
     </div>
 
     {% endif %}
 
 
-    <div class="info">
+    {% if error %}
 
-        <b>Model Information</b>
+    <div class="error">
+        {{ error }}
+    </div>
 
-        <br><br>
+    {% endif %}
 
-        Algorithm: Linear Regression
 
-        <br>
+    <div class="model-info">
 
-        Mean Absolute Error: {{ mae }}
+        <h3>📊 Model Information</h3>
 
-        <br>
+        <p>
+            <strong>Algorithm:</strong>
+            Linear Regression
+        </p>
 
-        R2 Score: {{ r2 }}
+        <p>
+            <strong>MAE:</strong>
+            ₹{{ "{:,.2f}".format(mae) }}
+        </p>
 
+        <p>
+            <strong>R² Score:</strong>
+            {{ "{:.4f}".format(r2) }}
+        </p>
+
+        <p>
+            <strong>Features:</strong>
+            Area, Bedrooms, Bathrooms, Location
+        </p>
+
+    </div>
+
+
+    <div class="footer">
+        House Price Prediction using Machine Learning
     </div>
 
 </div>
@@ -296,89 +418,152 @@ HTML_PAGE = """
 """
 
 
-# =========================================================
-# 9. FLASK ROUTE
-# =========================================================
+# ============================================================
+# HOME ROUTE
+# ============================================================
 
 @app.route("/", methods=["GET", "POST"])
-
 def home():
 
     prediction = None
+    error = None
+
+    area = ""
+    bedrooms = ""
+    bathrooms = ""
+
+    locations = sorted(
+        data["Location"].dropna().unique().tolist()
+    )
+
+    location = locations[0] if locations else ""
 
     if request.method == "POST":
 
-        # User input
-        area = float(request.form["area"])
+        try:
 
-        bedrooms = int(request.form["bedrooms"])
+            # --------------------------------------------
+            # GET USER INPUT
+            # --------------------------------------------
 
-        bathrooms = int(request.form["bathrooms"])
+            area = float(
+                request.form.get("area", 0)
+            )
 
-        location = request.form["location"]
+            bedrooms = int(
+                request.form.get("bedrooms", 0)
+            )
 
+            bathrooms = int(
+                request.form.get("bathrooms", 0)
+            )
 
-        # Location code
-        location_code = location_codes.get(location, 0)
-
-
-        # Create input dataframe
-        new_house = pd.DataFrame(
-            [[
-                area,
-                bedrooms,
-                bathrooms,
-                location_code
-            ]],
-
-            columns=[
-                "Area_sqft",
-                "Bedrooms",
-                "Bathrooms",
-                "Location"
-            ]
-        )
+            location = request.form.get(
+                "location",
+                ""
+            ).strip()
 
 
-        # Prediction
-        predicted_price = model.predict(new_house)[0]
+            # --------------------------------------------
+            # VALIDATION
+            # --------------------------------------------
+
+            if area <= 0:
+                raise ValueError(
+                    "Area must be greater than 0."
+                )
+
+            if bedrooms <= 0:
+                raise ValueError(
+                    "Bedrooms must be greater than 0."
+                )
+
+            if bathrooms <= 0:
+                raise ValueError(
+                    "Bathrooms must be greater than 0."
+                )
+
+            if location not in locations:
+                raise ValueError(
+                    "Please select a valid location."
+                )
 
 
-        # Format price
-        prediction = f"{predicted_price:,.2f}"
+            # --------------------------------------------
+            # CREATE NEW HOUSE DATA
+            # --------------------------------------------
+
+            new_house = pd.DataFrame(
+                [
+                    {
+                        "Area_sqft": area,
+                        "Bedrooms": bedrooms,
+                        "Bathrooms": bathrooms,
+                        "Location": location
+                    }
+                ]
+            )
+
+
+            # --------------------------------------------
+            # PREDICTION
+            # --------------------------------------------
+
+            predicted_price = model.predict(
+                new_house
+            )[0]
+
+
+            # --------------------------------------------
+            # SAFETY CHECK
+            # --------------------------------------------
+
+            if not np.isfinite(predicted_price):
+                raise ValueError(
+                    "Unable to calculate prediction."
+                )
+
+
+            # --------------------------------------------
+            # FORMAT PRICE
+            # --------------------------------------------
+
+            prediction = (
+                f"₹{predicted_price:,.2f}"
+            )
+
+
+        except Exception as e:
+
+            error = str(e)
 
 
     return render_template_string(
-        HTML_PAGE,
-
+        HTML,
         prediction=prediction,
-
-        mae=f"{mae:,.2f}",
-
-        r2=f"{r2:.4f}"
+        error=error,
+        area=area,
+        bedrooms=bedrooms,
+        bathrooms=bathrooms,
+        location=location,
+        locations=locations,
+        mae=mae,
+        r2=r2
     )
 
 
-# =========================================================
-# 10. RUN FLASK APPLICATION
-# =========================================================
+# ============================================================
+# RUN APP
+# ============================================================
 
 if __name__ == "__main__":
 
-    print("\n==========================================")
+    port = int(
+        os.environ.get("PORT", 5000)
+    )
 
-    print("HOUSE PRICE PREDICTION WEB APP")
-
-    print("==========================================")
-
-    print("\nOpen this URL in your browser:")
-
-    print("http://127.0.0.1:5000")
-
-    print("\n==========================================\n")
-
-    import os
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port,debug=False)
-      
-    
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
